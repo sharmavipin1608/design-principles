@@ -1,0 +1,10 @@
+title: Software Engineering Principles
+description: A review guide for AI-generated code — 35 principles across four tiers, plus an LLM-specific failure-mode lens.
+theme: jekyll-theme-primer
+
+# BUILD_SPEC.md is the generator's instructions, not part of the guide itself.
+exclude:
+  - BUILD_SPEC.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
