@@ -101,5 +101,5 @@ not via scattered getenv/getProperty calls.
 ## Going deeper
 
 - Wiggins, *The Twelve-Factor App*, Factor III ("Config") — the canonical short treatment of this exact principle.
-- Nygard, *Release It!*, 2nd ed., ch. 9 (Configuration) — fail-fast validation as a stability pattern.
-- Humble & Farley, *Continuous Delivery*, ch. 12 — managing configuration across environments as part of a deployment pipeline.
+- Nygard, *Release It!*, 2nd ed., Part II (Design for Deployment) — configuration as a deployment concern, and failing fast on bad config.
+- Humble & Farley, *Continuous Delivery*, ch. 2 (Configuration Management) — managing configuration across environments as a first-class pipeline concern.

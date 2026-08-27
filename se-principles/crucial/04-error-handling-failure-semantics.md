@@ -104,4 +104,4 @@ Always preserve the original exception as the cause when wrapping.
 
 - Nygard, *Release It!*, 2nd ed., ch. 5 ("Stability Patterns") — fail-fast vs. degrade as an explicit architectural choice.
 - Bloch, *Effective Java*, 3rd ed., ch. 10 (Exceptions) — checked vs. unchecked, preserving cause chains.
-- Cockburn, *"Why Exception Handling is Hard"* — canonical framing of exceptions as part of the contract, not an afterthought.
+- Nygard, *Release It!*, 2nd ed., ch. 4 ("Stability Antipatterns") — the integration-point and cascading-failure antipatterns that swallowed errors produce.

@@ -92,5 +92,5 @@ consumers a default/unknown case so new values don't break them.
 ## Going deeper
 
 - Fowler, *"Evolutionary Database Design"* and the expand/contract pattern (martinfowler.com).
-- Newman, *Building Microservices*, 2nd ed., ch. 4 — API versioning and compatibility across independently deployable services.
+- Newman, *Building Microservices*, 2nd ed., ch. 5 (Implementing Microservice Communication) — schema evolution, compatibility, and avoiding lockstep releases.
 - Google, *"API Design Guide"* (Google Cloud APIs design guide) — resource versioning and compatibility conventions.

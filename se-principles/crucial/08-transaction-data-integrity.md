@@ -28,6 +28,8 @@ A partial write is worse than a failed write, because a failed write is detectab
 - A database write followed by a message publish (or vice versa) with no outbox pattern — if the second call fails, the first is already committed.
 - A read-modify-write sequence (`read balance, compute new balance, write balance`) with no locking or version check, editable concurrently by two callers.
 - `@Transactional` (or equivalent) applied to a method that also makes an external HTTP call inside it — the external call isn't part of the transaction, but a rollback can't undo it.
+- `@Transactional` on a non-public method, or on a method called from *within* the same class — under Spring's default proxy-based AOP both are silently ignored, so the annotation is decorative and the transaction never starts.
+- Two or more rows locked in an order derived from the arguments (`from` then `to`) rather than a deterministic global order — a deadlock as soon as two callers pass those arguments in opposite order.
 - A batch job that processes N records without a per-record or per-batch transaction boundary, so a crash midway leaves an undefined subset processed.
 - No unique constraint or version column on a table where concurrent updates are expected.
 - A "transaction" that spans a network call to another service, blocking a database connection for the duration of an external round trip.
@@ -49,12 +51,19 @@ void transferFunds(String fromId, String toId, BigDecimal amount) {
 ```
 
 ```java
-// Fix: one transaction, optimistic locking prevents lost updates under concurrency
-@Transactional
-void transferFunds(String fromId, String toId, BigDecimal amount) {
-    Account from = accountRepo.findByIdForUpdate(fromId); // row lock / version check
-    Account to = accountRepo.findByIdForUpdate(toId);
+// Fix: one transaction; pessimistic row locks taken in a consistent order
+@Transactional // MUST be public: Spring's proxy-based AOP silently ignores it otherwise
+public void transferFunds(String fromId, String toId, BigDecimal amount) {
+    // Lock in a deterministic order (by id), NOT in from/to order — otherwise a
+    // concurrent A->B and B->A transfer acquire the two rows in opposite orders
+    // and deadlock. Ordering the acquisition removes the cycle entirely.
+    String firstId = fromId.compareTo(toId) <= 0 ? fromId : toId;
+    String secondId = fromId.compareTo(toId) <= 0 ? toId : fromId;
+    accountRepo.lockById(firstId);   // SELECT ... FOR UPDATE
+    accountRepo.lockById(secondId);
 
+    Account from = accountRepo.findById(fromId);
+    Account to = accountRepo.findById(toId);
     if (from.getBalance().compareTo(amount) < 0) {
         throw new InsufficientFundsException(fromId);
     }
@@ -65,7 +74,11 @@ void transferFunds(String fromId, String toId, BigDecimal amount) {
 }
 ```
 
-The fix makes the transfer atomic at the database level (both writes commit or neither does) and adds locking so a concurrent transfer touching the same account can't read a stale balance and silently lose an update.
+The fix makes the transfer atomic at the database level (both writes commit or neither does) and takes a row lock so a concurrent transfer touching the same account can't read a stale balance and silently lose an update. Three details carry most of the weight:
+
+- **`public` is load-bearing.** With Spring's default proxy-based AOP, `@Transactional` on a non-public method is silently ignored — no proxy interception, no transaction, no error. The method would look transactional and not be.
+- **`SELECT ... FOR UPDATE` is *pessimistic* locking** — it blocks competing writers until commit. The alternative, optimistic locking, uses a `@Version` column and detects the conflict at commit time, failing the loser with an exception the caller must retry. Either prevents lost updates; they are not the same mechanism, and mixing up the terms leads to expecting retry semantics the code doesn't have.
+- **Lock ordering prevents deadlock.** Acquiring in `from`/`to` order means simultaneous A→B and B→A transfers each hold what the other needs. Sorting the identifiers before acquiring imposes a global order, which is the standard structural fix (see [P-05](05-concurrency-thread-safety.md)).
 
 ## Review checklist
 
@@ -73,8 +86,10 @@ The fix makes the transfer atomic at the database level (both writes commit or n
 2. Is there a dual-write here (database + message, database + external API) with no outbox/saga to make it eventually consistent and repairable?
 3. Does any read-modify-write sequence on shared data lack locking or a version check?
 4. Is an external network call happening *inside* a database transaction, holding a connection for the round trip?
-5. Was the isolation level chosen deliberately, and does it actually prevent the anomalies this logic assumes are prevented?
-6. If this operation fails partway, is the resulting state either fully rolled back or explicitly compensable?
+5. Is every `@Transactional` method public and called from outside its own class — or is the annotation silently doing nothing?
+6. If more than one row/resource is locked, are they acquired in a deterministic global order rather than argument order?
+7. Was the isolation level chosen deliberately, and does it actually prevent the anomalies this logic assumes are prevented?
+8. If this operation fails partway, is the resulting state either fully rolled back or explicitly compensable?
 
 ## How AI-generated code violates this
 
@@ -110,4 +125,4 @@ database transaction.
 
 - Kleppmann, *Designing Data-Intensive Applications*, ch. 7 (Transactions) and ch. 9 (Consistency and Consensus).
 - Richardson, *Microservices Patterns*, ch. 4 (Saga pattern) and the transactional outbox pattern.
-- Fowler, *"Patterns of Distributed Systems"* (martinfowler.com) — outbox, saga, and related consistency patterns.
+- Joshi, *"Patterns of Distributed Systems"* (hosted on martinfowler.com) — write-ahead log, leader-follower, and related consistency patterns.

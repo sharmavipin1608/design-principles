@@ -57,6 +57,8 @@ BigDecimal getBalance(String accountId) {
 
 The fix ties the invalidation to the write, so a read immediately after an update reflects the new value rather than serving a stale cached one until an unrelated TTL happens to expire.
 
+It is not, however, race-free, and it's worth knowing exactly how far it gets you. Between `updateBalance` committing and `evict` running, a concurrent reader can miss the cache, read the *old* value from a replica or a not-yet-committed snapshot, and repopulate the entry after the evict lands — re-poisoning the cache with a stale value that now survives for a full TTL. Closing that window takes one of: evicting inside the same transaction (so the invalidation commits or rolls back with the write), writing through the cache under the same lock, or accepting the window deliberately and bounding it with a short TTL. Pick one on purpose. "Evict after write" is the right *shape* and the minimum bar — it is not, by itself, a correctness guarantee under concurrency.
+
 ## Review checklist
 
 1. Does every write path to cached data include a corresponding cache invalidation or update?
@@ -96,6 +98,7 @@ cache key expected to see concurrent traffic on miss.
 
 ## Going deeper
 
-- Kleppmann, *Designing Data-Intensive Applications*, ch. 3 (on derived data and caching as materialized views of a source of truth).
-- Karumanchi or standard distributed-systems references on the "cache stampede"/"thundering herd" problem and single-flight mitigation.
+- Kleppmann, *Designing Data-Intensive Applications*, Part III (Derived Data), esp. ch. 11 — caches and indexes as derived views that must be kept consistent with a system of record.
+- Nygard, *Release It!*, 2nd ed., ch. 4 ("Stability Antipatterns") — the dogpile/thundering-herd failure mode when a hot cache entry expires under load.
+- Caffeine and Redis documentation on cache-aside vs. write-through and on single-flight/`refreshAfterWrite` loading — the concrete mechanisms for the mitigations named above.
 - AWS/Redis vendor documentation on cache invalidation strategies (write-through, cache-aside, TTL-based) — practical patterns for this exact tradeoff.

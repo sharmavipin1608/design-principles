@@ -58,6 +58,8 @@ User getUser(String id) {
 
 The fix collapses the check and the write into a single atomic operation on a map designed for concurrent access, eliminating the window where two threads could both decide the entry is missing.
 
+One caveat worth knowing before copying this pattern: `ConcurrentHashMap.computeIfAbsent` holds a lock on the map's bin for the duration of the mapping function, so a slow `loadFromDb` blocks other threads whose keys hash to that bin, and a mapping function that recursively touches the same map throws `IllegalStateException`. For a cheap, non-blocking computation this is the right tool; for genuine I/O-backed caching, prefer a purpose-built cache (Caffeine's `LoadingCache`, which bounds and evicts as well) over hand-rolling one on top of a map.
+
 ## Review checklist
 
 1. For every field that can be read and written from more than one thread, is it protected (lock, atomic, concurrent collection) or immutable?

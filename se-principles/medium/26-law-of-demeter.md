@@ -44,7 +44,9 @@ String getShippingCity(Order order) {
 ```java
 // Fix: each object answers for its own structure; the caller asks one question
 class Order {
-    String getShippingCity() { return customer.getShippingCity(); }
+    String getShippingCity() {
+        return customer != null ? customer.getShippingCity() : "Unknown"; // same guard, one hop
+    }
 }
 class Customer {
     String getShippingCity() { return address != null ? address.getCity() : "Unknown"; }
@@ -54,7 +56,7 @@ class Customer {
 String city = order.getShippingCity();
 ```
 
-The fix moves the null-handling and structural knowledge to the objects that actually own that structure — `Order` no longer needs to know `Customer` has an `Address`, and a future change to how `Customer` stores its address touches one method instead of every caller across the codebase.
+The fix moves the null-handling and structural knowledge to the objects that actually own that structure — `Order` no longer needs to know `Customer` has an `Address`, and a future change to how `Customer` stores its address touches one method instead of every caller across the codebase. Each class still guards exactly the one reference it owns, so the composed behavior is identical to the original chain's; a refactor that quietly drops a null check while "cleaning up" a chain has traded a [P-26](26-law-of-demeter.md) smell for a [P-01](../crucial/01-correctness-and-edge-cases.md) bug, which is a bad trade in every tier ordering this guide uses.
 
 ## Review checklist
 

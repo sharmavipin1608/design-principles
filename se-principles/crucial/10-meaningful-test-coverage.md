@@ -58,7 +58,9 @@ void appliesTenPercentDiscountWhenOrderExceedsThreshold() {
 
     policy.apply(order, "SAVE10");
 
-    assertEquals(new BigDecimal("135.00"), order.getTotal()); // the actual business outcome
+    // compareTo, NOT equals: BigDecimal.equals() compares scale too, so
+    // 135.000 (the natural result of 150.00 x 0.9) is NOT equal to 135.00
+    assertEquals(0, new BigDecimal("135.00").compareTo(order.getTotal()));
 }
 
 @Test
@@ -68,11 +70,13 @@ void doesNotApplyDiscountBelowThreshold() {
 
     policy.apply(order, "SAVE10");
 
-    assertEquals(new BigDecimal("50.00"), order.getTotal()); // the boundary case, not just the happy path
+    assertEquals(0, new BigDecimal("50.00").compareTo(order.getTotal())); // boundary, not just happy path
 }
 ```
 
 The fix drops the mock of the logic being tested, asserts the actual computed total against a value derived from the spec (10% off over $100), and adds the boundary case that the original test never considered.
+
+The `compareTo` detail is not pedantry — it's a test that would otherwise fail for a reason unrelated to the behavior under test. `BigDecimal.equals()` requires equal *scale* as well as equal value, so `150.00 × 0.9` produces `135.000` (scale 3) which is not `.equals()` to `135.00` (scale 2). A test that red-flags correct code is as much a defect as one that passes broken code; both destroy the signal the suite exists to provide.
 
 ## Review checklist
 
@@ -114,6 +118,6 @@ against the post-fix code.
 
 ## Going deeper
 
-- Meszaros, *xUnit Test Patterns*, ch. 1–4 — test doubles and the specific failure mode of over-mocking.
+- Meszaros, *xUnit Test Patterns* — the "Test Double" pattern chapter and the "Overspecified Software"/"Fragile Test" smells, which name the over-mocking failure mode directly.
 - Fowler, *"Mocks Aren't Stubs"* (martinfowler.com) — the classic treatment of when mocking undermines what a test actually verifies.
-- Feathers, *Working Effectively with Legacy Code*, ch. 4 — characterization tests and the difference between testing behavior and testing implementation.
+- Feathers, *Working Effectively with Legacy Code*, ch. 13 ("I Need to Make a Change, but I Don't Know What Tests to Write") — characterization tests, and testing behavior rather than implementation.

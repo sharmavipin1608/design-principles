@@ -48,6 +48,9 @@ void processPayment(String orderId, BigDecimal amount) {
 
 ```java
 // Fix: structured, correlated, and the failure path is now visible in aggregate
+// kv() here is logstash-logback-encoder's StructuredArguments.kv, statically
+// imported; substitute your stack's structured-field API (SLF4J 2.x fluent
+// addKeyValue(), Log4j2 MapMessage, etc.) — the point is fields, not a string.
 void processPayment(String orderId, BigDecimal amount) {
     try {
         gateway.charge(orderId, amount);
@@ -104,5 +107,5 @@ full request/response body. Match log level to actual severity.
 ## Going deeper
 
 - Majors, Fong-Jones, Miranda, *Observability Engineering*, ch. 1–3 — the distinction between monitoring and observability, and structured events as the unit of telemetry.
-- Nygard, *Release It!*, 2nd ed., ch. 4 (Stabilizing patterns) and its treatment of production visibility.
+- Nygard, *Release It!*, 2nd ed., Part IV ("Solving Systemic Problems") — the Transparency chapter, on designing a system to reveal its own state in production.
 - Google SRE Book, ch. 6 (Monitoring Distributed Systems) — the four golden signals as a baseline for what to instrument.

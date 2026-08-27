@@ -42,7 +42,7 @@ double averagePrice(List<Product> products) {
     for (Product p : products) {
         sum += p.getPrice(); // NPE if getPrice() can return null
     }
-    return sum / products.size(); // divide-by-zero if products is empty
+    return sum / products.size(); // empty list -> 0.0/0 -> NaN, silently returned
 }
 ```
 
@@ -57,7 +57,7 @@ OptionalDouble averagePrice(List<Product> products) {
 }
 ```
 
-The fix makes "no valid price" a representable, checkable result instead of a crash on one input shape (empty list) and a wrong silent answer on another (nulls treated as zero would have been worse than an exception, and dividing by zero throws an unchecked `ArithmeticException`-free `NaN` that propagates quietly).
+The fix makes "no valid price" a representable, checkable result instead of two different silent wrong answers. Note the violation's empty-list case doesn't crash: `sum` is a `double`, so `0.0 / 0` is floating-point division yielding `NaN`, not an `ArithmeticException` — only *integer* division by zero throws. That `NaN` propagates quietly through every downstream calculation until something formats it for a user, which is strictly worse than a crash. `OptionalDouble.empty()` forces the caller to decide what "no prices" means.
 
 ## Review checklist
 
@@ -65,7 +65,7 @@ The fix makes "no valid price" a representable, checkable result instead of a cr
 2. For every `Optional` or nullable reference, is the absent case handled at first use, not assumed away?
 3. Are the boundary values (0, 1, max) visibly considered somewhere — code or test?
 4. Does any loop assume at least one iteration, and is that assumption actually guaranteed?
-5. Can any arithmetic here overflow, underflow, or divide by zero given realistic input ranges?
+5. Can any arithmetic here overflow, underflow, or divide by zero given realistic input ranges — and if it's floating-point, does a zero divisor produce a silent `NaN`/`Infinity` rather than an exception?
 6. If this parses external input (string, JSON, CSV), does malformed input get a defined outcome instead of an uncaught exception?
 
 ## How AI-generated code violates this
@@ -86,7 +86,7 @@ presence check.
 
 ## Scoring
 
-- **0 — Violated:** an unguarded index/`.get()` or divide-by-zero exists on a path reachable with realistic input.
+- **0 — Violated:** an unguarded index/`.get()`, or an arithmetic path that yields `NaN`/`Infinity`/an overflow on realistic input, is reachable.
 - **1 — Partial:** common edge cases (empty, null) handled; boundary cases (max, off-by-one) are not.
 - **2 — Met:** empty, null, and boundary cases are all explicitly handled or provably impossible.
 - **3 — Exemplary:** edge cases are encoded as types (sealed results, `Optional`) so the compiler enforces handling, not just convention.
@@ -100,5 +100,5 @@ presence check.
 ## Going deeper
 
 - Hoare, C.A.R., *"An Axiomatic Basis for Computer Programming"* — the origin of reasoning about pre/postconditions, the formal ancestor of "enumerate the domain."
-- Myers, Sandler, Badgett, *The Art of Software Testing*, ch. 2 (boundary value analysis and equivalence partitioning).
+- Myers, Sandler, Badgett, *The Art of Software Testing*, the Test-Case Design chapter (ch. 4 in the 3rd ed.) — boundary value analysis and equivalence partitioning.
 - Bloch, *Effective Java*, 3rd ed., Item 49 ("Check parameters for validity") and Item 55 (using `Optional` judiciously).

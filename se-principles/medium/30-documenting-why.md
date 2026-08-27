@@ -33,27 +33,35 @@ A comment describing *what* code does goes stale the moment the code changes and
 
 ```java
 // Violation: comments restate the code; the actually important context
-// (why 1.15, why this order) is missing entirely
-// multiply amount by 1.15
-BigDecimal total = amount.multiply(new BigDecimal("1.15"));
+// (why 1.20, why this threshold) is missing entirely
+// multiply amount by 1.20
+BigDecimal total = amount.multiply(new BigDecimal("1.20"));
 // check if user is eligible
 if (user.getTier() >= 3) {
-    applyDiscount(total);
+    total = applyLoyaltyDiscount(total);
 }
 ```
 
 ```java
-// Fix: no comment needed for the obvious steps; the comment that remains
-// explains the one thing the code can't say for itself
-// 15% VAT rate per EU Directive 2006/112/EC, Art. 96 — do not change without
-// checking the current applicable rate for the customer's jurisdiction
+// Fix: no comment needed for the obvious steps; the comments that remain
+// explain the two things the code can't say for itself
+private static final BigDecimal VAT_MULTIPLIER = new BigDecimal("1.20"); // 20% standard rate
+
+// Standard UK VAT rate, 20% since 2011-01-04 (HMRC VAT Notice 700).
+// Sourced from config in every other market — hardcoded here only because
+// this processor is UK-only; revisit before enabling a second jurisdiction.
 BigDecimal total = amount.multiply(VAT_MULTIPLIER);
+
+// Tier 3 is the contractual threshold in the enterprise agreement, not a
+// product decision — changing it requires legal sign-off, not just a PR.
 if (user.getTier() >= 3) {
-    applyDiscount(total);
+    total = applyLoyaltyDiscount(total);
 }
 ```
 
-The fix removes comments that added nothing beyond what the code already said, and keeps the one comment that captures information genuinely invisible in the code — a legal citation explaining why `1.15` is the multiplier and a warning about what changing it requires checking.
+The fix removes the comments that added nothing beyond what the code already said, and keeps the two that carry information genuinely invisible in the code: where the rate came from and what makes it safe to hardcode, and why a threshold that looks like a tunable product parameter actually isn't.
+
+Note what the *violating* comment could easily have become instead: a confident, specific-sounding citation to the wrong authority — "per EU Directive 2006/112/EC, Art. 96," say, when Art. 96 merely establishes that a standard rate applies and it's Art. 97 that sets the 15% *floor*, not any country's actual rate. A precise-looking citation that doesn't survive being checked is worse than no citation, because it transfers false confidence to every future reader. If you can't name the source exactly, describe the constraint and say where to verify it.
 
 ## Review checklist
 

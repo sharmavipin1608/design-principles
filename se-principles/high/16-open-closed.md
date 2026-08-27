@@ -17,7 +17,7 @@ A type-switch that grows with every new case means every addition is a modificat
 ## What good looks like
 
 - Adding a new case (a new type, a new provider, a new format) means adding a new class/implementation, not editing an existing method's branches.
-- A `sealed` interface with pattern matching is used where the compiler should enforce that every case is handled — not an open-ended `if`/`else` chain with no exhaustiveness check.
+- The choice between an open `interface` and a `sealed` one is made deliberately by whether the variant set is open (anyone may add one) or closed (a fixed set every consumer must handle exhaustively) — not by habit.
 - A registry or strategy map dispatches to the right implementation by key/type, so adding a case is a registration, not a code edit inside the dispatcher.
 - Shared logic that every case needs lives in the abstraction (a default method, a template method) rather than being copy-pasted per case.
 
@@ -42,28 +42,37 @@ BigDecimal calculateFee(String provider, BigDecimal amount) {
 ```
 
 ```java
-// Fix: adding a provider means adding a class — this method never changes again
-sealed interface FeeStrategy permits StripeFee, PayPalFee, SquareFee {
+// Fix: an open interface — a new provider is a new class, and nothing existing changes
+interface FeeStrategy {
     BigDecimal calculate(BigDecimal amount);
 }
 
 record StripeFee() implements FeeStrategy {
     public BigDecimal calculate(BigDecimal amount) { return amount.multiply(new BigDecimal("0.029")); }
 }
-// PayPalFee, SquareFee follow the same shape
+// PayPalFee, SquareFee follow the same shape, each in its own file
 
 BigDecimal calculateFee(FeeStrategy strategy, BigDecimal amount) {
-    return strategy.calculate(amount); // closed for modification, permanently
+    return strategy.calculate(amount); // no branch to extend, ever
 }
 ```
 
-Adding `SquareFee`, or a fourth provider, is now a new file implementing `FeeStrategy` — `calculateFee` never needs to be touched, reviewed, or regression-tested again for that change, and the `sealed` interface means the compiler flags any switch elsewhere that forgot to handle the new case.
+Adding a fourth provider is now a new file implementing `FeeStrategy` — `calculateFee` never needs to be touched, reviewed, or regression-tested for that change.
+
+**Deliberately *not* `sealed` here.** A `sealed interface` requires naming every implementation in its `permits` clause, so adding a provider would mean editing the interface — modification, which is exactly what this principle is trying to avoid. Sealed types solve the opposite problem: a *deliberately closed* set of variants where you want the compiler to force every `switch` to handle all of them exhaustively. Pick by which property you actually want:
+
+| You want | Use | Cost |
+|---|---|---|
+| Anyone can add a variant without touching existing code | open `interface` | no exhaustiveness checking; a missed case is a runtime problem |
+| A fixed set of variants, every consumer forced to handle all of them | `sealed interface` | every new variant edits the `permits` clause and every exhaustive switch |
+
+Payment providers, plugins, and export formats are open sets — use an interface. Domain states (`Pending | Settled | Refunded`), parse results, and command types are closed sets — use `sealed`, and accept that adding a case is a deliberate, compiler-assisted edit everywhere it matters.
 
 ## Review checklist
 
 1. Does adding the next expected case require editing an existing method's branches, or adding a new implementation?
 2. Is there a growing if/else-if or switch on a type discriminator with no exhaustiveness enforcement?
-3. Would a `sealed` type with pattern matching catch a missed case at compile time here?
+3. Is the variant set open (new cases added by anyone → plain `interface`) or closed (a fixed set → `sealed` with exhaustive pattern matching)? Does the code match that answer?
 4. Is shared per-case logic duplicated across implementations that should share a base or default method?
 5. Does business logic need to know about every implementation, or does a registry/factory abstract that away?
 
@@ -76,10 +85,14 @@ When asked to "add support for a new provider/type," a model working incremental
 ```
 Before adding a new case to an existing if/else-if chain or switch on a
 type discriminator, check how many cases it already has. At three or
-more, convert it to a sealed interface with one implementation per case
-(or a registry/strategy map) instead of adding another branch. Use sealed
-types with exhaustive pattern matching wherever the compiler can enforce
-that every case is handled.
+more, replace it with polymorphism — one implementation per case —
+instead of adding another branch. Choose the abstraction by whether the
+variant set is open or closed: use a plain interface (or a registry) when
+new variants should be addable without editing existing code, and a
+sealed interface only when the set is deliberately fixed and you want the
+compiler to force every consumer to handle all cases. Do not use a sealed
+type for an extension point — its permits clause must be edited for every
+new variant, which defeats the purpose.
 ```
 
 ## Scoring
@@ -99,4 +112,4 @@ that every case is handled.
 
 - Martin, *Agile Software Development, Principles, Patterns, and Practices*, ch. 9 (The Open-Closed Principle).
 - Gamma, Helm, Johnson, Vlissides, *Design Patterns*, Strategy and Template Method chapters.
-- Meyer, *Object-Oriented Software Construction*, 2nd ed., ch. 2 — the origin of the open/closed formulation.
+- Meyer, *Object-Oriented Software Construction*, 2nd ed., ch. 3 (Modularity) — where the open-closed principle is introduced.

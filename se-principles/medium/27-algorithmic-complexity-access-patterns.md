@@ -90,5 +90,5 @@ production data volume, not just the size of the test fixture.
 ## Going deeper
 
 - Cormen, Leiserson, Rivest, Stein, *Introduction to Algorithms*, ch. 1–4 — the formal basis for reasoning about growth rate.
-- Karwin, *SQL Antipatterns*, ch. 1 ("Jaywalking") and the N+1 selects antipattern specifically.
-- High Scalability / vendor ORM documentation (e.g., Hibernate's "N+1 Selects Problem") — practical, tool-specific detection and fixes.
+- Karwin, *SQL Antipatterns* — the "Reading" / query antipatterns section, on pushing work into the database instead of looping in application code.
+- Hibernate and JPA documentation on the "N+1 selects problem" — fetch joins, batch fetching, and entity graphs as the tool-specific fixes.
