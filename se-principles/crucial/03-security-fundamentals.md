@@ -103,4 +103,4 @@ PII field. Deserialize only into fixed, specific types.
 
 - OWASP Top 10 (current revision) — injection and broken access control are consistently the top two categories.
 - OWASP, *Cheat Sheet Series* — SQL Injection Prevention, Authorization Testing Automation.
-- McGraw, *Software Security: Building Security In*, ch. 12 (touchpoints for review).
+- McGraw, *Software Security: Building Security In*, ch. 3 (Introduction to Software Security Touchpoints) — code review and architectural risk analysis as the two highest-yield touchpoints.

@@ -36,7 +36,7 @@ A resource leak doesn't fail the request that caused it — it fails some *other
 ## Code: violation → fix
 
 ```java
-// Violation: connection leaks if query() throws; no timeout on the query itself
+// Violation: connection leaks if executeQuery() or mapRows() throws; no query timeout
 Connection conn = dataSource.getConnection();
 ResultSet rs = conn.createStatement().executeQuery(sql);
 List<Row> rows = mapRows(rs);
@@ -51,8 +51,8 @@ try (Connection conn = dataSource.getConnection();
     stmt.setQueryTimeout(5); // seconds — no unbounded wait
     try (ResultSet rs = stmt.executeQuery(sql)) {
         return mapRows(rs);
-    }
-} // conn, stmt, and rs all close here, even if mapRows throws
+    } // rs closes here, even if mapRows throws
+} // stmt and conn close here, in reverse order of acquisition
 ```
 
 The fix guarantees release regardless of where an exception occurs, and adds a query timeout so a slow or hanging query can't hold the connection indefinitely under load.

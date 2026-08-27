@@ -38,7 +38,8 @@ Everything downstream of the boundary is written assuming valid input, because r
 // Violation: no boundary — "validation" is scattered guesswork downstream
 @PostMapping("/transfers")
 ResponseEntity<?> transfer(@RequestBody Map<String, Object> body) {
-    return service.transfer(body); // service has to guess what's in here
+    service.transfer(body); // service has to guess what's in here
+    return ResponseEntity.ok().build();
 }
 
 void transfer(Map<String, Object> body) {
@@ -112,5 +113,5 @@ admin, internal) must go through the same boundary validation.
 ## Going deeper
 
 - OWASP, *Input Validation Cheat Sheet* — canonical treatment of boundary validation strategy (allowlist vs. denylist, canonicalization).
-- Evans, *Domain-Driven Design*, ch. 3–4 — the concept of a bounded context maps closely to "where trust changes."
+- Evans, *Domain-Driven Design*, ch. 14 (Maintaining Model Integrity) — bounded contexts, whose edges map closely to "where trust changes."
 - Bloch, *Effective Java*, 3rd ed., Item 49 ("Check parameters for validity").

@@ -49,21 +49,25 @@ void chargeOrder(Order order) {
 ```
 
 ```java
-// Fix: idempotency key tied to the order, checked by the gateway/local ledger
-void chargeOrder(Order order) {
+// Fix: idempotency key tied to the order; retries bounded, backed off, and never silent
+void chargeOrder(Order order) throws ChargeFailedException {
     String idempotencyKey = "charge:" + order.getId(); // stable across retries
+    TimeoutException lastFailure = null;
     for (int attempt = 0; attempt < 3; attempt++) {
         try {
             paymentGateway.charge(order.getCustomerId(), order.getAmount(), idempotencyKey);
             return; // gateway guarantees this key charges at most once
         } catch (TimeoutException e) {
-            // safe to retry: same key means a duplicate is detected, not re-applied
+            lastFailure = e; // safe to retry: the same key collapses a duplicate
+            backoff(attempt); // exponential + jitter, so retries don't synchronize
         }
     }
+    // exhausting retries is a failure, not a success — never fall out of the loop silently
+    throw new ChargeFailedException("charge unresolved for order=" + order.getId(), lastFailure);
 }
 ```
 
-The fix doesn't prevent the retry — a timeout genuinely doesn't tell you whether the charge landed — it makes the retry safe by tying every attempt to a stable key the gateway uses to collapse duplicates into a single effect.
+The fix doesn't prevent the retry — a timeout genuinely doesn't tell you whether the charge landed — it makes the retry safe by tying every attempt to a stable key the gateway uses to collapse duplicates into a single effect. Note the two things beyond the key itself: a backoff, so three retries from many callers don't converge into a synchronized burst against an already-struggling gateway, and a `throw` after the loop. Falling out of a retry loop and returning normally reports success for an operation whose outcome is genuinely unknown — a [P-04](04-error-handling-failure-semantics.md) violation that idempotency does nothing to excuse.
 
 ## Review checklist
 
